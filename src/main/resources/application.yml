@@ -1,5 +1,72 @@
 spring:
   data:
     mongodb:
-      uri: mongodb://localhost:27017/mini_siem_db  # Local MongoDB
+      uri: mongodb://localhost:27017/mini_siem_db
       auto-index-creation: true
+
+  # Security Configuration
+  security:
+    user:
+      name: admin
+      password: admin123
+
+  # Application Configuration
+  application:
+    name: Mini-SIEM
+
+  # Server Configuration
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# JWT Configuration
+jwt:
+  secret: myVerySecretKeyThatShouldBeChangedInProduction123456789
+  expiration: 86400 # 24 hours in seconds
+
+# Logging Configuration
+logging:
+  level:
+    com.miniSIEM: DEBUG
+    org.springframework.security: DEBUG
+    org.mongodb.driver: WARN
+  pattern:
+    file: "%d{ISO8601} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/mini-siem.log
+
+# Management Configuration (for health checks)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# Custom Application Properties
+app:
+  security:
+    jwt:
+      secret: ${jwt.secret}
+      expiration: ${jwt.expiration}
+    rate-limit:
+      requests-per-minute: 100
+
+  logs:
+    max-bulk-size: 1000
+    retention-days: 365
+
+  alerts:
+    enabled: true
+    email:
+      enabled: false
+      smtp-host: localhost
+      smtp-port: 587
+    webhook:
+      enabled: false
+      url: ""

@@ -1,12 +1,16 @@
 package com.miniSIEM.model;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 @Document(collection = "logs")
-@Data // This generates getters and setters for all fields
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class LogEntry {
     @Id
     private String id;
