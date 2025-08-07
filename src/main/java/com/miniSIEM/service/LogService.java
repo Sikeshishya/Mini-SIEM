@@ -4,6 +4,8 @@ import com.miniSIEM.model.LogEntry;
 import com.miniSIEM.repository.LogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -21,6 +23,11 @@ import java.util.Map;
 public class LogService {
     private final LogRepository logRepository;
 
+    // Lazy injection to avoid circular dependency
+    @Autowired
+    @Lazy
+    private DashboardService dashboardService;
+
     public LogEntry saveLog(LogEntry logEntry) {
         // Set timestamp to current time if not provided
         if (logEntry.getTimestamp() == null) {
@@ -32,6 +39,11 @@ public class LogService {
 
         LogEntry savedLog = logRepository.save(logEntry);
         log.debug("Log entry saved: {}", savedLog.getId());
+
+        // Broadcast to real-time dashboard clients
+        if (dashboardService != null) {
+            dashboardService.broadcastNewLog(savedLog);
+        }
 
         return savedLog;
     }
@@ -52,6 +64,11 @@ public class LogService {
 
         List<LogEntry> savedLogs = logRepository.saveAll(logEntries);
         log.info("Bulk log insertion completed: {} entries saved", savedLogs.size());
+
+        // Broadcast each log for real-time updates
+        if (dashboardService != null) {
+            savedLogs.forEach(dashboardService::broadcastNewLog);
+        }
 
         return savedLogs;
     }

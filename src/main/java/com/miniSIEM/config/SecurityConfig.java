@@ -5,6 +5,7 @@ import com.miniSIEM.security.JwtAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -63,11 +64,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
 
-                        // Analyst and Admin can write logs
-                        .requestMatchers("POST", "/api/logs").hasAnyRole("ADMIN", "ANALYST")
+                        .requestMatchers(HttpMethod.POST, "/api/logs").hasAnyRole("ADMIN", "ANALYST")
+                        .requestMatchers(HttpMethod.GET, "/api/logs/**").hasAnyRole("ADMIN", "ANALYST", "VIEWER")
 
-                        // All authenticated users can read logs
-                        .requestMatchers("GET", "/api/logs/**").hasAnyRole("ADMIN", "ANALYST", "VIEWER")
+
+                        .requestMatchers("/dashboard.html", "/login.html", "/css/**", "/js/**", "/images/**").permitAll()
 
                         // All other requests require authentication
                         .anyRequest().authenticated()

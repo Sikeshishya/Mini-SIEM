@@ -27,6 +27,9 @@ public interface LogRepository extends MongoRepository<LogEntry, String> {
     long countByIp(String ip);
     long countBySource(String source);
 
+    // Find logs after timestamp (for dashboard)
+    List<LogEntry> findByTimestampAfter(Instant timestamp);
+
     // Custom query to handle multiple optional filters with pagination
     @Query("{ " +
             "$and: [ " +
@@ -63,4 +66,16 @@ public interface LogRepository extends MongoRepository<LogEntry, String> {
     // Find error logs in time range
     @Query("{ 'logLevel': 'ERROR', 'timestamp': { $gte: ?0, $lte: ?1 } }")
     List<LogEntry> findErrorsInRange(Instant start, Instant end);
+
+    // Dashboard specific queries
+    @Query("{ 'timestamp': { $gte: ?0 } }")
+    List<LogEntry> findByTimestampAfter(Instant timestamp, Pageable pageable);
+
+    // Get log count by hour for trends
+    @Query(value = "{ 'timestamp': { $gte: ?0 } }", count = true)
+    long countLogsSince(Instant since);
+
+    // Find logs with high frequency from same IP (potential DDoS)
+    @Query("{ 'ip': ?0, 'timestamp': { $gte: ?1, $lte: ?2 } }")
+    List<LogEntry> findByIpInTimeRange(String ip, Instant start, Instant end);
 }

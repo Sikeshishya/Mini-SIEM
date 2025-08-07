@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini SIEM - Dashboard</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        body {
+            background-color: #0a0e1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .card {
+            background: linear-gradient(135deg, #1a1f3a 0%, #16213e 100%);
+            border: 1px solid #2d3748;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .metric-card {
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .metric-label {
+            color: #a0aec0;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-normal { color: #48bb78; }
+        .status-warning { color: #ed8936; }
+        .status-critical { color: #f56565; }
+        .status-info { color: #4299e1; }
+
+        .log-entry {
+            padding: 0.75rem;
+            margin: 0.25rem 0;
+            border-left: 4px solid;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .log-entry:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .log-error { border-left-color: #f56565; }
+        .log-warn { border-left-color: #ed8936; }
+        .log-info { border-left-color: #4299e1; }
+        .log-debug { border-left-color: #9f7aea; }
+
+        .real-time-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #48bb78;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        .btn-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .alert-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+        }
+        /* dashboardContent debug box */
+        #dashboardContent {
+            background: rgba(40,50,70,0.45);
+            color: #d1d5db;
+            font-size: 0.97em;
+            padding: 1em 0.75em;
+            margin-bottom: 1.4em;
+            border-radius: 6px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">
+            <i class="fas fa-shield-alt"></i> Mini SIEM
+        </a>
+        <div class="navbar-nav ms-auto">
+                <span class="navbar-text">
+                    <span class="real-time-indicator"></span>
+                    Real-time Monitoring
+                </span>
+            <a class="nav-link" href="#" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid mt-4">
+    <!-- (NEW) Debug/JSON Content Area -->
+    <div id="dashboardContent"></div>
+
+    <!-- Alert Banner -->
+    <div id="alertBanner" class="alert alert-custom alert-dismissible fade show d-none" role="alert">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span id="alertMessage">System Alert</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card metric-card">
+                <i class="fas fa-list-alt fa-2x status-info"></i>
+                <div class="metric-value" id="totalLogs">0</div>
+                <div class="metric-label">Total Logs</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card metric-card">
+                <i class="fas fa-clock fa-2x status-normal"></i>
+                <div class="metric-value" id="logsLast24h">0</div>
+                <div class="metric-label">Last 24h</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card metric-card">
+                <i class="fas fa-exclamation-triangle fa-2x status-warning"></i>
+                <div class="metric-value" id="activeThreats">0</div>
+                <div class="metric-label">Active Threats</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card metric-card">
+                <i class="fas fa-bell fa-2x status-critical"></i>
+                <div class="metric-value" id="criticalAlerts">0</div>
+                <div class="metric-label">Critical Alerts</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card metric-card">
+                <i class="fas fa-tachometer-alt fa-2x status-info"></i>
+                <div class="metric-value" id="logsPerMinute">0</div>
+                <div class="metric-label">Logs/Min</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card metric-card">
+                <i class="fas fa-heartbeat fa-2x" id="systemStatusIcon"></i>
+                <div class="metric-value" id="systemStatus">NORMAL</div>
+                <div class="metric-label">System Status</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i> Log Activity Trends
+                    </h5>
+                    <button class="btn btn-custom btn-sm" onclick="refreshCharts()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Log Levels
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="levelChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Logs and Threats Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-stream"></i> Real-time Log Feed
+                    </h5>
+                    <div>
+                        <button class="btn btn-custom btn-sm" onclick="togglePause()">
+                            <i class="fas fa-pause" id="pauseIcon"></i> <span id="pauseText">Pause</span>
+                        </button>
+                        <button class="btn btn-custom btn-sm" onclick="clearLogs()">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="realTimeLogs" style="height: 400px; overflow-y: auto;">
+                        <!-- Real-time logs will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-skull-crossbones"></i> Threat Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="threatSummary">
+                        <!-- Threat information will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Sources Row -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-server"></i> Top Log Sources
+                    </h5>
+                    <button class="btn btn-custom btn-sm" onclick="exportData()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="sourcesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Global variables
+    let jwtToken = localStorage.getItem('jwtToken');
+    let eventSource;
+    let isPaused = false;
+    let charts = {};
+
+    // Check authentication
+    if (!jwtToken) {
+        window.location.href = 'login.html';
+    }
+
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeCharts();
+        loadDashboardData();
+        connectRealTimeStream();
+
+        // Refresh data every 30 seconds
+        setInterval(loadDashboardData, 30000);
+    });
+
+    // API helper function
+    async function apiCall(endpoint, method = 'GET', data = null) {
+        try {
+            const options = {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${jwtToken}`,
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(`http://localhost:8080/api${endpoint}`, options);
+
+            if (response.status === 401) {
+                logout();
+                return null;
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API call failed:', error);
+            return null;
+        }
+    }
+
+    // Load main dashboard data
+    async function loadDashboardData() {
+        const stats = await apiCall('/dashboard/stats');
+        if (stats) {
+            updateMetrics(stats);
+            updateSystemStatus(stats.systemStatus);
+        }
+
+        const threats = await apiCall('/dashboard/threats');
+        if (threats) {
+            updateThreatSummary(threats);
+        }
+
+        const sources = await apiCall('/dashboard/top-sources?limit=10');
+        if (sources) {
+            updateSourcesChart(sources);
+        }
+
+        const trends = await apiCall('/dashboard/log-trends?hours=24');
+        if (trends) {
+            updateActivityChart(trends);
+        }
+    }
+
+    // Update metrics display
+    function updateMetrics(stats) {
+        document.getElementById('totalLogs').textContent = formatNumber(stats.totalLogs);
+        document.getElementById('logsLast24h').textContent = formatNumber(stats.logsLast24h);
+        document.getElementById('activeThreats').textContent = stats.activeThreats;
+        document.getElementById('criticalAlerts').textContent = stats.criticalAlerts;
+        document.getElementById('logsPerMinute').textContent = Math.round(stats.logsPerMinute * 100) / 100;
+
+        // Update level chart
+        if (stats.logsByLevel && charts.levelChart) {
+            updateLevelChart(stats.logsByLevel);
+        }
+    }
+
+    // Update system status
+    function updateSystemStatus(status) {
+        const statusElement = document.getElementById('systemStatus');
+        const iconElement = document.getElementById('systemStatusIcon');
+
+        statusElement.textContent = status;
+
+        // Remove all status classes
+        iconElement.className = iconElement.className.replace(/status-\w+/g, '');
+
+        // Add appropriate status class
+        switch(status) {
+            case 'NORMAL':
+                iconElement.classList.add('status-normal');
+                break;
+            case 'BUSY':
+                iconElement.classList.add('status-warning');
+                break;
+            case 'ALERT':
+                iconElement.classList.add('status-critical');
+                showAlert('System Alert: High threat activity detected!');
+                break;
+            default:
+                iconElement.classList.add('status-info');
+        }
+    }
+
+    // Connect to real-time stream
+    function connectRealTimeStream() {
+        if (eventSource) {
+            eventSource.close();
+        }
+
+        eventSource = new EventSource(`http://localhost:8080/api/dashboard/realtime?token=${jwtToken}`);
+
+        eventSource.onopen = function(event) {
+            console.log('Real-time connection established');
+        };
+
+        eventSource.addEventListener('newLog', function(event) {
+            if (!isPaused) {
+                const logData = JSON.parse(event.data);
+                addLogToFeed(logData);
+            }
+        });
+
+        eventSource.onerror = function(event) {
+            console.error('Real-time connection error:', event);
+            setTimeout(connectRealTimeStream, 5000); // Reconnect after 5 seconds
+        };
+    }
+
+    // Add log to real-time feed
+    function addLogToFeed(logData) {
+        const logsContainer = document.getElementById('realTimeLogs');
+        const logElement = document.createElement('div');
+
+        logElement.className = `log-entry log-${logData.level.toLowerCase()}`;
+        logElement.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <span><strong>${logData.source}</strong> - ${logData.message}</span>
+                <small class="text-muted">${new Date(logData.timestamp).toLocaleTimeString()}</small>
+            </div>
+            <small class="text-muted">IP: ${logData.ip || 'N/A'} | Level: ${logData.level}</small>
+        `;
+
+        logsContainer.insertBefore(logElement, logsContainer.firstChild);
+
+        // Keep only last 50 entries
+        while (logsContainer.children.length > 50) {
+            logsContainer.removeChild(logsContainer.lastChild);
+        }
+    }
+
+    // Initialize charts
+    function initializeCharts() {
+        // Activity Chart
+        const activityCtx = document.getElementById('activityChart').getContext('2d');
+        charts.activityChart = new Chart(activityCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Log Activity',
+                    data: [],
+                    borderColor: '#4299e1',
+                    backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#ffffff' } }
+                },
+                scales: {
+                    x: { ticks: { color: '#a0aec0' }, grid: { color: 'rgba(160, 174, 192, 0.2)' } },
+                    y: { ticks: { color: '#a0aec0' }, grid: { color: 'rgba(160, 174, 192, 0.2)' } }
+                }
+            }
+        });
+
+        // Level Chart
+        const levelCtx = document.getElementById('levelChart').getContext('2d');
+        charts.levelChart = new Chart(levelCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['ERROR', 'WARN', 'INFO', 'DEBUG'],
+                datasets: [{
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['#f56565', '#ed8936', '#4299e1', '#9f7aea']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#ffffff' } }
+                }
+            }
+        });
+
+        // Sources Chart
+        const sourcesCtx = document.getElementById('sourcesChart').getContext('2d');
+        charts.sourcesChart = new Chart(sourcesCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Log Count',
+                    data: [],
+                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                    borderColor: '#667eea',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#ffffff' } }
+                },
+                scales: {
+                    x: { ticks: { color: '#a0aec0' }, grid: { color: 'rgba(160, 174, 192, 0.2)' } },
+                    y: { ticks: { color: '#a0aec0' }, grid: { color: 'rgba(160, 174, 192, 0.2)' } }
+                }
+            }
+        });
+    }
+
+    // Update charts
+    function updateActivityChart(trends) {
+        if (!charts.activityChart) return;
+
+        const labels = trends.map(t => new Date(t.timestamp).toLocaleTimeString());
+        const data = trends.map(t => t.count);
+
+        charts.activityChart.data.labels = labels;
+        charts.activityChart.data.datasets[0].data = data;
+        charts.activityChart.update();
+    }
+
+    function updateLevelChart(logsByLevel) {
+        if (!charts.levelChart) return;
+
+        const data = [
+            logsByLevel.ERROR || 0,
+            logsByLevel.WARN || 0,
+            logsByLevel.INFO || 0,
+            logsByLevel.DEBUG || 0
+        ];
+
+        charts.levelChart.data.datasets[0].data = data;
+        charts.levelChart.update();
+    }
+
+    function updateSourcesChart(sources) {
+        if (!charts.sourcesChart) return;
+
+        const labels = sources.map(s => s.source);
+        const data = sources.map(s => s.count);
+
+        charts.sourcesChart.data.labels = labels;
+        charts.sourcesChart.data.datasets[0].data = data;
+        charts.sourcesChart.update();
+    }
+
+    // Update threat summary
+    function updateThreatSummary(threats) {
+        const container = document.getElementById('threatSummary');
+
+        if (threats.threats.length === 0) {
+            container.innerHTML = '<p class="text-center text-muted">No active threats detected</p>';
+            return;
+        }
+
+        let html = '';
+        threats.threats.forEach(threat => {
+            const severityClass = threat.severity === 'HIGH' ? 'status-critical' :
+                               threat.severity === 'MEDIUM' ? 'status-warning' : 'status-normal';
+
+            html += `
+                <div class="alert alert-dark border-start border-3 border-${severityClass} mb-2">
+                    <div class="d-flex justify-content-between">
+                        <strong>${threat.type}</strong>
+                        <span class="badge bg-danger">${threat.severity}</span>
+                    </div>
+                    <small class="text-muted">${threat.description}</small><br>
+                    <small class="text-muted">IP: ${threat.sourceIp} | Risk: ${threat.riskScore}/100</small>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // Utility functions
+    function formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+    }
+
+    function showAlert(message) {
+        const banner = document.getElementById('alertBanner');
+        const messageElement = document.getElementById('alertMessage');
+
+        messageElement.textContent = message;
+        banner.classList.remove('d-none');
+    }
+
+    function togglePause() {
+        isPaused = !isPaused;
+        const icon = document.getElementById('pauseIcon');
+        const text = document.getElementById('pauseText');
+
+        if (isPaused) {
+            icon.className = 'fas fa-play';
+            text.textContent = 'Resume';
+        } else {
+            icon.className = 'fas fa-pause';
+            text.textContent = 'Pause';
+        }
+    }
+
+    function clearLogs() {
+        document.getElementById('realTimeLogs').innerHTML = '';
+    }
+
+    function refreshCharts() {
+        loadDashboardData();
+    }
+
+    function exportData() {
+        window.open(`http://localhost:8080/api/dashboard/export`, '_blank');
+    }
+
+    function logout() {
+        localStorage.removeItem('jwtToken');
+        if (eventSource) {
+            eventSource.close();
+        }
+        window.location.href = 'login.html';
+    }
+
+    // Handle page visibility changes
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            if (eventSource) {
+                eventSource.close();
+            }
+        } else {
+            connectRealTimeStream();
+            loadDashboardData();
+        }
+    });
+</script>
+<!-- New script for /api/dashboard JSON display -->
+<script>
+    document.addEventListener("DOMContentLoaded", async function () {
+      const token = localStorage.getItem("jwtToken");
+      if (!token) return; // Already handled by your main script
+
+      try {
+        const response = await fetch("http://localhost:8080/api/dashboard", {
+          method: "GET",
+          headers: {
+            "Authorization": "Bearer " + token
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          document.getElementById("dashboardContent").innerText = JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        // Optionally log error
+      }
+    });
+</script>
+</body>
+</html>
