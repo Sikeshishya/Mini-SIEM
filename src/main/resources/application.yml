@@ -29,7 +29,7 @@ server:
 # JWT Configuration
 jwt:
   secret: myVerySecretKeyThatShouldBeChangedInProduction123456789
-  expiration: 86400 # 24 hours in seconds
+  expiration: 86400000  # 24 hours in seconds
 
 # Logging Configuration
 logging:
@@ -58,7 +58,7 @@ app:
   security:
     jwt:
       secret: ${jwt.secret}
-      expiration: ${jwt.expiration}
+      expiration: 3600000
     rate-limit:
       requests-per-minute: 100
 

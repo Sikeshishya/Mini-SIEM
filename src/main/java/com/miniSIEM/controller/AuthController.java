@@ -8,6 +8,7 @@ import com.miniSIEM.security.JwtUtil;
 import com.miniSIEM.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,6 +31,10 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
     private final JwtUtil jwtUtil;
+
+
+
+    private long expiration;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody AuthRequest authRequest) {
@@ -56,7 +61,7 @@ public class AuthController {
                     .authorities(userDetails.getAuthorities().stream()
                             .map(auth -> auth.getAuthority())
                             .toList())
-                    .expiresAt(Instant.now().plusSeconds(86400)) // 24 hours
+                    .expiresAt(Instant.now().plusSeconds(3600)) // 1 hours
                     .build();
 
             log.info("Login successful for user: {}", authRequest.getUsername());
